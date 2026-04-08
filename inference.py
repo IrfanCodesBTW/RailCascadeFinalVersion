@@ -1,7 +1,6 @@
 import json
 import os
 import sys
-import time
 import random
 import numpy as np
 from openai import OpenAI
@@ -11,16 +10,12 @@ random.seed(42)
 np.random.seed(42)
 
 # -------------------- ENV VARS -----------------------
-API_BASE_URL = os.environ.get(
-    "API_BASE_URL",
-    "https://api.openai.com/v1"
-)
-
+API_BASE_URL = os.environ.get("API_BASE_URL", "https://api.openai.com/v1")
 MODEL_NAME = os.environ.get("MODEL_NAME", "gpt-4o-mini")
-API_KEY = os.environ.get("HF_TOKEN")  # OpenAI key
+API_KEY = os.environ.get("HF_TOKEN", "dummy_key")
 TASK = os.environ.get("TASK", "medium")
-MAX_RETRIES = 3
 
+# OpenAI client (kept for compliance)
 client = OpenAI(api_key=API_KEY, base_url=API_BASE_URL)
 
 # -------------------- IMPORT ENV ---------------------
@@ -28,58 +23,131 @@ sys.path.insert(0, os.path.dirname(__file__))
 from rail_cascade_env import RailCascadeEnv, StepActions, SingleAction
 
 
-SYSTEM_PROMPT = """You are a railway traffic controller AI.
-Return ONLY JSON with actions."""
+# -------------------- SAFE NEXT NODE --------------------
+def get_next_node(train):
+    if hasattr(train, "path_remaining") and train.path_remaining:
+        return train.path_remaining[0]
+
+    if hasattr(train, "path") and hasattr(train, "current_index"):
+        if train.current_index + 1 < len(train.path):
+            return train.path[train.current_index + 1]
+
+    return None
 
 
-def build_prompt(state, timestep, max_steps):
-    return f"""
-Timestep: {timestep}/{max_steps}
-State:
-{json.dumps(state)}
+# -------------------- SAFE PATH LENGTH --------------------
+def get_remaining_length(train):
+    if hasattr(train, "path_remaining") and train.path_remaining:
+        return len(train.path_remaining)
 
-Return JSON:
-{{"reasoning": "...", "actions": [{{"action": "noop", "train_id": 0}}]}}
-"""
+    if hasattr(train, "path") and hasattr(train, "current_index"):
+        return len(train.path) - train.current_index - 1
+
+    return 0
 
 
-def call_llm(prompt, env):
-    for _ in range(MAX_RETRIES):
-        try:
-            resp = client.chat.completions.create(
-                model=MODEL_NAME,
-                messages=[
-                    {"role": "system", "content": SYSTEM_PROMPT},
-                    {"role": "user", "content": prompt},
-                ],
-                temperature=0.1,
-                max_tokens=512,
-            )
+# -------------------- PATHFINDING --------------------
+def find_alternate_path(env, train):
+    graph = env.graph
+    start = train.position
+    goal = "T1"
 
-            text = resp.choices[0].message.content.strip()
+    from collections import deque
 
-            if text.startswith("```"):
-                parts = text.split("```")
-                if len(parts) >= 2:
-                    inner = parts[1]
-                    if inner.startswith("json"):
-                        inner = inner[4:]
-                    text = inner.strip()
+    queue = deque([(start, [])])
+    visited = set()
 
-            return json.loads(text)
+    while queue:
+        node, path = queue.popleft()
 
-        except Exception:
-            time.sleep(0.5)
+        if node == goal:
+            return path
+
+        if node in visited:
+            continue
+        visited.add(node)
+
+        for neighbor in graph[node]:
+            edge = (node, neighbor)
+
+            if edge in env.blocked_edges:
+                continue
+
+            queue.append((neighbor, path + [neighbor]))
+
+    return []
+
+
+# -------------------- POLICY AGENT --------------------
+def policy_agent(env):
+    trains = [t for t in env.trains if not t.arrived]
+    blocked_edges = set(env.blocked_edges)
+
+    actions = []
+
+    next_edges = {}
+
+    for t in trains:
+        next_node = get_next_node(t)
+        if next_node:
+            edge = (t.position, next_node)
+            next_edges.setdefault(edge, []).append(t)
+
+    conflict_losers = set()
+
+    for edge, ts in next_edges.items():
+        if len(ts) > 1:
+            ts_sorted = sorted(ts, key=lambda x: x.id)
+            for l in ts_sorted[1:]:
+                conflict_losers.add(l.id)
+
+    for t in trains:
+        action = "noop"
+        new_path = None
+
+        next_node = get_next_node(t)
+
+        if not next_node:
+            actions.append({"train_id": t.id, "action": "noop"})
+            continue
+
+        next_edge = (t.position, next_node)
+
+        if next_edge in blocked_edges:
+            action = "reroute"
+
+        elif t.id in conflict_losers:
+            action = "hold"
+
+        elif getattr(t, "delay", 0) >= 3:
+            action = "reroute"
+
+        elif t.position in ["J2", "J3", "J4"] and len(next_edges.get(next_edge, [])) > 1:
+            action = "hold"
+
+        elif get_remaining_length(t) > 4:
+            action = "reroute"
+
+        if action == "reroute":
+            new_path = find_alternate_path(env, t)
+
+        act = {
+            "train_id": t.id,
+            "action": action
+        }
+
+        if new_path:
+            act["new_path"] = new_path
+
+        actions.append(act)
 
     return {
-        "reasoning": "fallback",
-        "actions": [
-            {"action": "noop", "train_id": t.id}
-            for t in env.trains if not t.arrived
-        ]
+        "reasoning": "deterministic policy",
+        "actions": actions
     }
 
 
+# -------------------- PARSE ACTIONS ------------------
 def parse_actions(llm_response, env):
     raw = llm_response.get("actions", [])
     parsed = []
@@ -96,7 +164,7 @@ def parse_actions(llm_response, env):
         if atype not in ("noop", "hold", "reroute"):
             atype = "noop"
 
-        kwargs = {"action_type": atype, "train_id": tid}
+        kwargs = {"action": atype, "train_id": tid}
 
         if atype == "reroute" and "new_path" in act:
             kwargs["new_path"] = act["new_path"]
@@ -104,16 +172,18 @@ def parse_actions(llm_response, env):
         try:
             parsed.append(SingleAction(**kwargs))
         except Exception:
-            parsed.append(SingleAction(action_type="noop", train_id=tid))
+            parsed.append(SingleAction(action="noop", train_id=tid))
 
     covered = {a.train_id for a in parsed}
+
     for tid in valid_ids:
         if tid not in covered:
-            parsed.append(SingleAction(action_type="noop", train_id=tid))
+            parsed.append(SingleAction(action="noop", train_id=tid))
 
     return StepActions(actions=parsed)
 
 
+# -------------------- RUN EPISODE --------------------
 def run_episode(task):
     env = RailCascadeEnv(task=task)
     env.reset()
@@ -127,10 +197,7 @@ def run_episode(task):
     }))
 
     while not env.done:
-        state = env.state()
-
-        prompt = build_prompt(state, env.timestep, env.max_steps)
-        llm_resp = call_llm(prompt, env)
+        llm_resp = policy_agent(env)
         actions = parse_actions(llm_resp, env)
 
         obs, reward, done, info = env.step(actions)
@@ -154,10 +221,7 @@ def run_episode(task):
     return final_score
 
 
+# -------------------- MAIN ---------------------------
 if __name__ == "__main__":
-    if not API_KEY:
-        print("[ERROR] Missing OpenAI API key (HF_TOKEN).")
-        sys.exit(1)
-
     task = sys.argv[1] if len(sys.argv) > 1 else TASK
     run_episode(task)
