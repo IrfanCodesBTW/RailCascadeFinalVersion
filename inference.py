@@ -6,6 +6,7 @@ import numpy as np
 from openai import OpenAI
 from fastapi import FastAPI
 from pydantic import BaseModel as PydanticBase
+from typing import Optional
 import uvicorn
 
 # -------------------- DETERMINISM --------------------
@@ -276,7 +277,9 @@ class ResetRequest(PydanticBase):
     task: str = "medium"
 
 @http_app.post("/reset")
-async def reset_endpoint(request: ResetRequest):
+async def reset_endpoint(request: Optional[ResetRequest] = None):
+    if request is None:
+        request = ResetRequest()
     valid_tasks = ("easy", "medium", "hard", "dynamic_medium", "extreme", "vip_routing")
     task = request.task if request.task in valid_tasks else "medium"
     try:

@@ -16,6 +16,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
+from typing import Optional
 
 from rail_cascade_env import (
     ALL_EDGES,
@@ -137,8 +138,10 @@ async def get_tasks():
 
 @app.post("/reset")
 @app.post("/api/reset")
-async def reset_env(request: ResetRequest):
+async def reset_env(request: Optional[ResetRequest] = None):
     """Reset the environment with the specified task. Returns a session_id."""
+    if request is None:
+        request = ResetRequest()
     if request.task not in TASK_CONFIGS:
         raise HTTPException(
             status_code=400,
