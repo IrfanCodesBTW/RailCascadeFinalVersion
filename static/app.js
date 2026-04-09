@@ -157,15 +157,15 @@ async function stepEnv() {
     animProgress = 0;
     animStartTime = performance.now();
 
-    // Track history - use info.new_delay and info.conflicts (actual env field names)
-    const inf = data.info || {};
+    // Track history - reward_breakdown is in data.info
+    const rb = (data.info && data.info.reward_breakdown) ? data.info.reward_breakdown : {};
     stepHistory.push({
         step: envState.timestep,
-        delay: inf.new_delay || 0,
-        conflicts: inf.conflicts || 0,
-        totalDelay: inf.total_delay != null ? inf.total_delay : 0,
+        delay: rb.new_delay_this_step || 0,
+        conflicts: rb.conflict_count || 0,
+        totalDelay: data.info && data.info.total_delay != null ? data.info.total_delay : 0,
     });
-    totalConflicts += inf.conflicts || 0;
+    totalConflicts += rb.conflict_count || 0;
 
     return data;
 }
@@ -426,7 +426,7 @@ function drawTrains() {
         const ty = pos.y + offsetY;
 
         // Glow for arrived trains
-        if (train.status === 'arrived') {
+        if (train.arrived) {
             const glow = ctx.createRadialGradient(tx, ty, 0, tx, ty, TRAIN_RADIUS * 3);
             glow.addColorStop(0, '#34d39940');
             glow.addColorStop(1, 'transparent');
@@ -440,9 +440,9 @@ function drawTrains() {
         ctx.beginPath();
         ctx.arc(tx, ty, TRAIN_RADIUS, 0, Math.PI * 2);
 
-        if (train.status === 'arrived') {
+        if (train.arrived) {
             ctx.fillStyle = '#34d399';
-        } else if (train.status === 'held') {
+        } else if (train.held) {
             ctx.fillStyle = '#fbbf24';
         } else {
             ctx.fillStyle = color;
@@ -462,7 +462,7 @@ function drawTrains() {
         ctx.fillText(train.id, tx, ty);
 
         // Delay badge (if any)
-        if (train.delay > 0 && train.status !== 'arrived') {
+        if (train.delay > 0 && !train.arrived) {
             const badgeX = tx + TRAIN_RADIUS + 3;
             const badgeY = ty - TRAIN_RADIUS - 2;
             ctx.fillStyle = 'rgba(251, 113, 133, 0.9)';
@@ -558,7 +558,7 @@ function updateUI(data) {
     // Check for arrivals
     if (state.trains) {
         state.trains.forEach(t => {
-            if (t.status === 'arrived' && prevTrainPositions[t.id] && prevTrainPositions[t.id] !== 'T1') {
+            if (t.arrived && prevTrainPositions[t.id] && prevTrainPositions[t.id] !== 'T1') {
                 addEvent('arrival', `t=${state.timestep}: Train ${t.id} ARRIVED at T1!`);
             }
         });
@@ -573,19 +573,18 @@ function updateTrainTable(trains) {
         const color = TRAIN_COLORS[t.id % TRAIN_COLORS.length];
         let status, statusClass;
 
-        const tStatus = t.status || '';
-        if (tStatus === 'arrived') {
+        if (t.arrived) {
             status = 'Arrived';
             statusClass = 'arrived';
-        } else if (tStatus === 'held') {
+        } else if (t.held) {
             status = 'Held';
             statusClass = 'held';
-        } else if (tStatus === 'moving') {
+        } else if (t.delay > 0 && t.path_remaining.length > 0) {
             status = 'Moving';
             statusClass = 'moving';
-        } else if (tStatus === 'blocked' || tStatus === 'stranded') {
-            status = tStatus.charAt(0).toUpperCase() + tStatus.slice(1);
-            statusClass = 'blocked';
+        } else if (t.path_remaining.length > 0) {
+            status = 'Moving';
+            statusClass = 'moving';
         } else {
             status = 'Waiting';
             statusClass = 'blocked';

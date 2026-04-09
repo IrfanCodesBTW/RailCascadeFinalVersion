@@ -221,7 +221,41 @@ def run_episode(task):
     return final_score
 
 
+# -------------------- HTTP SERVER (for OpenEnv checker) --------------------
+from fastapi import FastAPI
+from pydantic import BaseModel as PydanticBase
+import uvicorn
+
+http_app = FastAPI(title="RailCascade Inference Server")
+
+class ResetRequest(PydanticBase):
+    task: str = "medium"
+
+@http_app.post("/reset")
+async def reset_endpoint(request: ResetRequest):
+    """OpenEnv checker POSTs here to verify the environment is alive."""
+    valid_tasks = ("easy", "medium", "hard", "dynamic_medium", "extreme")
+    task = request.task if request.task in valid_tasks else "medium"
+    env = RailCascadeEnv(task=task)
+    env.reset()
+    return {"status": "ok", "task": task, "score": float(env.get_score())}
+
+@http_app.get("/ping")
+async def ping():
+    return {"status": "ok"}
+
+@http_app.get("/health")
+async def health():
+    return {"status": "healthy"}
+
+
 # -------------------- MAIN ---------------------------
 if __name__ == "__main__":
-    task = sys.argv[1] if len(sys.argv) > 1 else TASK
-    run_episode(task)
+    CLI_TASKS = ("easy", "medium", "hard", "dynamic_medium", "extreme")
+    if len(sys.argv) > 1 and sys.argv[1] in CLI_TASKS:
+        # CLI mode: python inference.py medium
+        run_episode(sys.argv[1])
+    else:
+        # Server mode: start HTTP server for OpenEnv checker
+        print("Starting RailCascade inference server on port 8080...")
+        uvicorn.run(http_app, host="0.0.0.0", port=8080, log_level="info")
