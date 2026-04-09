@@ -248,6 +248,6 @@ if __name__ == "__main__":
 
     print("=" * 60)
     print("RailCascade Mini V2 -- Server")
-    print("Open http://localhost:8000 in your browser")
+    print("Open http://localhost:7860 in your browser")
     print("=" * 60)
     uvicorn.run(app, host="0.0.0.0", port=7860, log_level="info")

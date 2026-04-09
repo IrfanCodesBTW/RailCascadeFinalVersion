@@ -30,6 +30,9 @@ class TrainState(BaseModel):
     position: str
     delay: int
     status: Literal["moving", "held", "blocked", "arrived", "stranded"]
+    path_remaining: list[str] = []
+    arrived: bool = False
+    held: bool = False
 
 
 class TrackState(BaseModel):
@@ -41,7 +44,7 @@ class TrackState(BaseModel):
 
 class ObservationState(BaseModel):
     """Full observable state returned by reset() and step()."""
-    time_step: int
+    timestep: int
     max_steps: int
     task: str
     done: bool
@@ -121,6 +124,9 @@ class _Train:
             position=self.position,
             delay=self.delay,
             status="blocked" if blocked else self.status,
+            path_remaining=list(self.path),
+            arrived=self.arrived,
+            held=self.held,
         )
 
 
@@ -729,7 +735,7 @@ class RailCascadeEnv:
             for src, dst in ALL_EDGES
         ]
         return ObservationState(
-            time_step=self.timestep,
+            timestep=self.timestep,
             max_steps=self.max_steps,
             task=self.task,
             done=self.done,

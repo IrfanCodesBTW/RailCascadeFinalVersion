@@ -15,7 +15,7 @@ np.random.seed(42)
 # -------------------- ENV VARS -----------------------
 API_BASE_URL = os.environ.get("API_BASE_URL", "https://api.openai.com/v1")
 MODEL_NAME = os.environ.get("MODEL_NAME", "gpt-4o-mini")
-API_KEY = os.environ.get("HF_TOKEN", "dummy_key")
+API_KEY = os.environ.get("HF_TOKEN")
 TASK = os.environ.get("TASK", "medium")
 
 # OpenAI client (kept for compliance)
