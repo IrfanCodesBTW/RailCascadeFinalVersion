@@ -137,10 +137,10 @@ async def get_tasks():
 
 @app.post("/reset")
 @app.post("/api/reset")
-async def reset_env(request: ResetRequest = Body(None)):
+@app.get("/reset")
+@app.get("/api/reset")
+async def reset_env(request: ResetRequest = Body(default=ResetRequest())):
     """Reset the environment with the specified task. Returns a session_id."""
-    if request is None:
-        request = ResetRequest()
     if request.task not in TASK_CONFIGS:
         raise HTTPException(
             status_code=400,

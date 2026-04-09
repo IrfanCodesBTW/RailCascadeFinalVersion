@@ -277,9 +277,8 @@ class ResetRequest(PydanticBase):
     task: str = "medium"
 
 @http_app.post("/reset")
-async def reset_endpoint(request: Optional[ResetRequest] = Body(None)):
-    if request is None:
-        request = ResetRequest()
+@http_app.get("/reset")
+async def reset_endpoint(request: ResetRequest = Body(default=ResetRequest())):
     valid_tasks = ("easy", "medium", "hard", "dynamic_medium", "extreme", "vip_routing")
     task = request.task if request.task in valid_tasks else "medium"
     try:
