@@ -1,3 +1,12 @@
+---
+title: RailCascade Mini V2
+emoji: 🚀
+colorFrom: purple
+colorTo: indigo
+sdk: docker
+pinned: false
+---
+
 # RailCascade Mini V2
 
 **Deterministic Railway Traffic Management RL Environment**

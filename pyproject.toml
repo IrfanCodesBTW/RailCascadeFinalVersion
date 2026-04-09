@@ -14,7 +14,11 @@ dependencies = [
     "pydantic",
     "openai",
     "numpy",
+    "openenv-core>=0.2.0",
 ]
+
+[project.scripts]
+server = "server.app:app"
 
 [project.urls]
 Homepage = "https://huggingface.co/spaces/IrfanCodes/RailCascadeMiniV2"
