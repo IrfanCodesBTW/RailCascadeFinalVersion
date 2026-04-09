@@ -58,6 +58,13 @@ tasks:
     max_steps: 60
     difficulty: 1.0
 
+  - name: vip_routing
+    trains: 6
+    blocked_edges: 2
+    max_steps: 30
+    difficulty: 0.6
+    description: "VIP trains (id 0, 3) incur 5x delay penalty"
+
 action_space:
   type: array
   items:

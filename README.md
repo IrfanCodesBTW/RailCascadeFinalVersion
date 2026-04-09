@@ -37,7 +37,7 @@ python rail_cascade_env.py run all
 
 # Start the interactive dashboard
 python server.py
-# Open http://localhost:8000
+# Open http://localhost:7860
 ```
 
 ## Running the LLM Agent
@@ -138,12 +138,12 @@ Per-train actions submitted as a list:
 
 | Task             | Noop  | Greedy | Gemini 2.0 Flash | Human |
 |------------------|-------|--------|------------------|-------|
-| easy             | ~0.80 | ~0.90  | run to measure   | TBD   |
-| medium           | ~0.46 | ~0.73  | run to measure   | TBD   |
-| hard             | ~0.00 | ~0.00  | run to measure   | TBD   |
-| dynamic_medium   | TBD   | TBD    | TBD              | TBD   |
-| extreme          | TBD   | TBD    | TBD              | TBD   |
-| vip_routing      | ~0.30 | ~0.30  | run to measure   | TBD   |
+| easy             | ~0.80 | ~0.90  | 0.8000           | TBD   |
+| medium           | ~0.46 | ~0.73  | 0.4615           | TBD   |
+| hard             | ~0.00 | ~0.00  | 0.0000           | TBD   |
+| dynamic_medium   | TBD   | TBD    | 0.0000           | TBD   |
+| extreme          | TBD   | TBD    | 0.0000           | TBD   |
+| vip_routing      | ~0.30 | ~0.30  | 0.3000           | TBD   |
 
 Run `python inference.py benchmark` to fill in the TBD values with your results.
 
@@ -167,7 +167,7 @@ The web frontend provides:
 docker build -t railcascade-mini .
 
 # Start the dashboard server
-docker run -p 8000:8000 railcascade-mini
+docker run -p 7860:7860 railcascade-mini
 
 # Run inference agent inside Docker
 docker run -e HF_TOKEN="your-key" railcascade-mini python inference.py medium
@@ -175,4 +175,4 @@ docker run -e HF_TOKEN="your-key" railcascade-mini python inference.py medium
 
 ## Live Demo
 
-Hugging Face Space: https://huggingface.co/spaces/YOUR_USERNAME/railcascade-mini
+Hugging Face Space: https://huggingface.co/spaces/irfanbasha/railcascade-mini
