@@ -1,4 +1,4 @@
-# RailCascade
+# RailCascadeMiniV2
 
 **Deterministic Railway Traffic Management RL Environment**
 
