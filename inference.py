@@ -4,7 +4,7 @@ import sys
 import random
 import numpy as np
 from openai import OpenAI
-from fastapi import FastAPI
+from fastapi import FastAPI, Body
 from pydantic import BaseModel as PydanticBase
 from typing import Optional
 import uvicorn
@@ -277,7 +277,7 @@ class ResetRequest(PydanticBase):
     task: str = "medium"
 
 @http_app.post("/reset")
-async def reset_endpoint(request: Optional[ResetRequest] = None):
+async def reset_endpoint(request: Optional[ResetRequest] = Body(None)):
     if request is None:
         request = ResetRequest()
     valid_tasks = ("easy", "medium", "hard", "dynamic_medium", "extreme", "vip_routing")
@@ -291,6 +291,7 @@ async def reset_endpoint(request: Optional[ResetRequest] = None):
             "score": float(env.get_score()),
             "n_trains": len(env.trains),
             "blocked_edges": [list(e) for e in env.blocked_edges],
+            "state": obs.model_dump()
         }
     except Exception as e:
         return {"status": "error", "detail": str(e)}, 500

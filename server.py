@@ -11,12 +11,11 @@ from pathlib import Path
 from typing import Any, Union
 from uuid import uuid4
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Body
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
-from typing import Optional
 
 from rail_cascade_env import (
     ALL_EDGES,
@@ -138,7 +137,7 @@ async def get_tasks():
 
 @app.post("/reset")
 @app.post("/api/reset")
-async def reset_env(request: Optional[ResetRequest] = None):
+async def reset_env(request: ResetRequest = Body(None)):
     """Reset the environment with the specified task. Returns a session_id."""
     if request is None:
         request = ResetRequest()

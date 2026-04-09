@@ -9,7 +9,7 @@ description: >
 domain: transportation
 deterministic: true
 
-huggingface_space_url: "https://huggingface.co/spaces/IrfanCodes/RailCascadeMiniV2"
+huggingface_space_url: "https://huggingface.co/spaces/irfanbasha/railcascade-mini"
 
 inference:
   entry_point: inference.py
