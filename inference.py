@@ -5,6 +5,7 @@ import random
 import numpy as np
 from openai import OpenAI
 from fastapi import FastAPI, Body
+from fastapi import Request
 import uvicorn
 
 # -------------------- DETERMINISM --------------------
@@ -33,18 +34,23 @@ from rail_cascade_env import RailCascadeEnv
 http_app = FastAPI(title="RailCascade Inference Server")
 
 # -------------------- RESET --------------------------
+
+
 @http_app.post("/reset")
 @http_app.get("/reset")
-async def reset_endpoint(request: dict | None = Body(default=None)):
-    request = request or {}
-
-    task = request.get("task", "medium")
-
-    valid_tasks = ("easy", "medium", "hard", "dynamic_medium", "extreme", "vip_routing")
-    if task not in valid_tasks:
-        task = "medium"
-
+async def reset_endpoint(request: Request):
     try:
+        try:
+            body = await request.json()
+        except:
+            body = {}
+
+        task = body.get("task", "medium")
+
+        valid_tasks = ("easy", "medium", "hard", "dynamic_medium", "extreme", "vip_routing")
+        if task not in valid_tasks:
+            task = "medium"
+
         env = RailCascadeEnv(task=task)
         obs = env.reset()
 
@@ -59,7 +65,6 @@ async def reset_endpoint(request: dict | None = Body(default=None)):
 
     except Exception as e:
         return {"status": "error", "detail": str(e)}
-
 # -------------------- STEP (MINIMAL SAFE) ------------
 @http_app.post("/step")
 async def step_endpoint(request: dict = Body(...)):
