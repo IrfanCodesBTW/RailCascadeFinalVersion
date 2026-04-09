@@ -16,7 +16,7 @@ inference:
   auth_env_var: HF_TOKEN
   model_env_var: MODEL_NAME
   base_url_env_var: API_BASE_URL
-  default_model: gemini-2.0-flash
+  default_model: gpt-4o-mini
   log_format: jsonl
   log_events:
     - "[START]"
