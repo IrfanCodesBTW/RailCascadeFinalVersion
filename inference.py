@@ -35,7 +35,9 @@ http_app = FastAPI(title="RailCascade Inference Server")
 # -------------------- RESET --------------------------
 @http_app.post("/reset")
 @http_app.get("/reset")
-async def reset_endpoint(request: dict = Body(default={})):
+async def reset_endpoint(request: dict | None = Body(default=None)):
+    request = request or {}
+
     task = request.get("task", "medium")
 
     valid_tasks = ("easy", "medium", "hard", "dynamic_medium", "extreme", "vip_routing")
