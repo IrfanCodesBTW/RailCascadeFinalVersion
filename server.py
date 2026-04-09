@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Any
+from typing import Any, Union
 from uuid import uuid4
 
 from fastapi import FastAPI, HTTPException
@@ -79,9 +79,11 @@ class AutoStepRequest(BaseModel):
 
 class EnvResponse(BaseModel):
     state: dict
-    reward: float
+    reward: Union[float, dict]   # float for reset/state; float for step (breakdown in info)
     done: bool
     info: dict
+    session_id: str = ""
+    score: float = 0.0
 
 
 # ---------------------------------------------------------------
@@ -147,11 +149,14 @@ async def reset_env(request: ResetRequest):
     sessions[sid] = RailCascadeEnv(task=request.task)
     sessions[sid].reset()
 
+    _score = sessions[sid].get_score()
     return EnvResponse(
         state=sessions[sid].state(),
         reward=0.0,
         done=sessions[sid].done,
-        info={"session_id": sid, "score": sessions[sid].get_score()},
+        info={},
+        session_id=sid,
+        score=_score,
     )
 
 
@@ -167,7 +172,9 @@ async def get_state(session_id: str):
         state=env.state(),
         reward=0.0,
         done=env.done,
-        info={"session_id": session_id, "score": env.get_score()},
+        info={},
+        session_id=session_id,
+        score=env.get_score(),
     )
 
 
@@ -197,7 +204,9 @@ async def step_env(request: StepRequest):
         state=env.state(),
         reward=reward.step_reward,
         done=done,
-        info={**info, "session_id": request.session_id, "score": env.get_score(), "reward_breakdown": reward.reward_breakdown, "total_delay": reward.total_delay},
+        info={**info, "reward_breakdown": reward.reward_breakdown, "total_delay": reward.total_delay},
+        session_id=request.session_id,
+        score=env.get_score(),
     )
 
 
@@ -217,7 +226,9 @@ async def auto_step(request: AutoStepRequest):
         state=env.state(),
         reward=reward.step_reward,
         done=done,
-        info={**info, "session_id": request.session_id, "score": env.get_score(), "reward_breakdown": reward.reward_breakdown, "total_delay": reward.total_delay},
+        info={**info, "reward_breakdown": reward.reward_breakdown, "total_delay": reward.total_delay},
+        session_id=request.session_id,
+        score=env.get_score(),
     )
 
 
@@ -239,4 +250,4 @@ if __name__ == "__main__":
     print("RailCascade Mini V2 -- Server")
     print("Open http://localhost:8000 in your browser")
     print("=" * 60)
-    uvicorn.run(app, host="0.0.0.0", port=8000, log_level="info")
+    uvicorn.run(app, host="0.0.0.0", port=7860, log_level="info")

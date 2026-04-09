@@ -157,16 +157,15 @@ async function stepEnv() {
     animProgress = 0;
     animStartTime = performance.now();
 
-    // Track history
-    if (data.reward) {
-        stepHistory.push({
-            step: envState.timestep,
-            delay: data.reward.new_delay_this_step || 0,
-            conflicts: data.reward.conflict_count || 0,
-            totalDelay: data.reward.total_delay || 0,
-        });
-        totalConflicts += data.reward.conflict_count || 0;
-    }
+    // Track history - reward_breakdown is in data.info
+    const rb = (data.info && data.info.reward_breakdown) ? data.info.reward_breakdown : {};
+    stepHistory.push({
+        step: envState.timestep,
+        delay: rb.new_delay_this_step || 0,
+        conflicts: rb.conflict_count || 0,
+        totalDelay: data.info && data.info.total_delay != null ? data.info.total_delay : 0,
+    });
+    totalConflicts += rb.conflict_count || 0;
 
     return data;
 }
