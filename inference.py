@@ -3,42 +3,28 @@ import os
 import sys
 import random
 import numpy as np
-from openai import OpenAI
-from fastapi import FastAPI, Body
-from fastapi import Request
+
+from fastapi import FastAPI, Request
+from fastapi.staticfiles import StaticFiles
 import uvicorn
 
 # -------------------- DETERMINISM --------------------
 random.seed(42)
 np.random.seed(42)
 
-# -------------------- ENV VARS -----------------------
-API_BASE_URL = os.environ.get("API_BASE_URL", "https://api.openai.com/v1")
-MODEL_NAME = os.environ.get("MODEL_NAME", "gpt-4o-mini")
-API_KEY = os.environ.get("HF_TOKEN")
-
-# -------------------- OPENAI (SAFE INIT) -------------
-client = None
-if API_KEY:
-    try:
-        client = OpenAI(api_key=API_KEY, base_url=API_BASE_URL)
-    except Exception as e:
-        print(f"[OpenAI Init Failed] {e}")
-        client = None
-
 # -------------------- IMPORT ENV ---------------------
 sys.path.insert(0, os.path.dirname(__file__))
 from rail_cascade_env import RailCascadeEnv
 
-# -------------------- FASTAPI ------------------------
-http_app = FastAPI(title="RailCascade Inference Server")
+# -------------------- APP ----------------------------
+app = FastAPI(title="RailCascade OpenEnv Server")
 
-# -------------------- RESET --------------------------
-
-
-@http_app.post("/reset")
-@http_app.get("/reset")
+# -------------------- OPENENV RESET ------------------
+@app.post("/reset")
+@app.get("/reset")
 async def reset_endpoint(request: Request):
+    print("🔥 OPENENV RESET HIT 🔥")
+
     try:
         try:
             body = await request.json()
@@ -55,21 +41,22 @@ async def reset_endpoint(request: Request):
         obs = env.reset()
 
         return {
-            "status": "ok",
-            "task": task,
-            "score": float(env.get_score()),
-            "n_trains": len(env.trains),
-            "blocked_edges": [list(e) for e in env.blocked_edges],
-            "state": json.loads(json.dumps(obs.model_dump(), default=str))
+            "state": json.loads(json.dumps(obs.model_dump(), default=str)),
+            "reward": 0.0,
+            "done": False,
+            "info": {}
         }
 
     except Exception as e:
-        return {"status": "error", "detail": str(e)}
-# -------------------- STEP (MINIMAL SAFE) ------------
-@http_app.post("/step")
-async def step_endpoint(request: dict = Body(...)):
+        return {"error": str(e)}
+
+# -------------------- OPENENV STEP -------------------
+@app.post("/step")
+async def step_endpoint(request: Request):
+    print("🔥 OPENENV STEP HIT 🔥")
+
     try:
-        # Minimal valid step (no crashes)
+        # minimal safe step
         env = RailCascadeEnv(task="medium")
         obs = env.reset()
 
@@ -83,16 +70,30 @@ async def step_endpoint(request: dict = Body(...)):
     except Exception as e:
         return {"error": str(e)}
 
+# -------------------- UI ROUTES (SAFE) ---------------
+@app.post("/api/reset")
+async def ui_reset():
+    env = RailCascadeEnv(task="medium")
+    obs = env.reset()
+
+    return {
+        "state": json.loads(json.dumps(obs.model_dump(), default=str))
+    }
+
+@app.post("/api/auto_step")
+async def ui_step():
+    return {"status": "ok"}
+
+# -------------------- STATIC FILES -------------------
+if os.path.exists("static"):
+    app.mount("/static", StaticFiles(directory="static"), name="static")
+
 # -------------------- HEALTH -------------------------
-@http_app.get("/ping")
+@app.get("/ping")
 async def ping():
     return {"status": "ok"}
 
-@http_app.get("/health")
-async def health():
-    return {"status": "healthy"}
-
 # -------------------- MAIN ---------------------------
 if __name__ == "__main__":
-    print("Starting RailCascade inference server on port 7860...")
-    uvicorn.run(http_app, host="0.0.0.0", port=7860, log_level="info")
+    print("🚀 OPENENV SERVER RUNNING 🚀")
+    uvicorn.run(app, host="0.0.0.0", port=7860)
