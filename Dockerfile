@@ -7,8 +7,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 
-EXPOSE 8000
-
+EXPOSE 7860
 # Default: start the server
 # Override with: docker run ... python inference.py medium
 CMD ["python", "server.py"]
