@@ -22,6 +22,11 @@ from rail_cascade_env import RailCascadeEnv, StepActions, SingleAction
 # -------------------- APP ----------------------------
 app = FastAPI()
 
+# -------------------- ROOT ---------------------------
+@app.get("/")
+async def root():
+    return {"message": "RailCascade API is running", "status": "online"}
+
 # -------------------- GLOBAL STATE ------------------
 # The evaluator calls /reset then /step repeatedly in sequence.
 # We must persist the env instance across requests — creating a new
