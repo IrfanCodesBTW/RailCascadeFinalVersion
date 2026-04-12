@@ -1,9 +1,6 @@
-import uvicorn
-from inference import app
+# This file is intentionally a no-op entrypoint.
+# The Dockerfile CMD uses uvicorn CLI directly.
+# Do NOT call uvicorn.run() here — it causes double-bind on port 7860.
 
-def main():
-    """Entry point for the OpenEnv multi-mode deployment."""
-    uvicorn.run(app, host="0.0.0.0", port=7860)
+from inference import app  # noqa: F401 — re-exported for any external import
 
-if __name__ == "__main__":
-    main()

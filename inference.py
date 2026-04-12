@@ -12,7 +12,6 @@ random.seed(42)
 np.random.seed(42)
 
 # -------------------- IMPORT ENV ---------------------
-# Use abspath to handle edge cases where __file__ resolves to '' on import
 _THIS_DIR = os.path.dirname(os.path.abspath(__file__))
 if _THIS_DIR not in sys.path:
     sys.path.insert(0, _THIS_DIR)
@@ -28,9 +27,6 @@ async def root():
     return {"message": "RailCascade API is running", "status": "online"}
 
 # -------------------- GLOBAL STATE ------------------
-# The evaluator calls /reset then /step repeatedly in sequence.
-# We must persist the env instance across requests — creating a new
-# env on every call loses all simulation state.
 _env: RailCascadeEnv | None = None
 
 # -------------------- RESET --------------------------
@@ -80,19 +76,15 @@ async def step_endpoint(request: Request):
     global _env
 
     try:
-        # If no env exists yet (evaluator skipped /reset), initialise a default one
         if _env is None:
             _env = RailCascadeEnv(task="medium")
             _env.reset()
 
-        # Parse action payload from request body
         try:
             body = await request.json()
         except Exception:
             body = {}
 
-        # Build StepActions from the request body.
-        # Evaluator may send: {"actions": [...]} or a bare list, or an empty body.
         if isinstance(body, dict) and "actions" in body:
             raw_actions = body["actions"]
         elif isinstance(body, list):
@@ -100,21 +92,16 @@ async def step_endpoint(request: Request):
         else:
             raw_actions = []
 
-        # Parse each individual action safely
         parsed_actions = []
         for item in raw_actions:
             try:
                 parsed_actions.append(SingleAction(**item))
             except Exception:
-                # Skip malformed action entries rather than crashing
                 continue
 
         step_actions = StepActions(actions=parsed_actions)
-
-        # Execute the simulation step
         obs, reward, done, info = _env.step(step_actions)
 
-        # Serialise reward (Pydantic model)
         try:
             reward_dict = reward.model_dump()
         except Exception:
@@ -144,10 +131,16 @@ async def ping():
     return {"status": "ok"}
 
 # -------------------- MAIN ---------------------------
-# uvicorn.run() is ONLY called when the file is executed directly.
-# When the OpenEnv evaluator imports this file (import-based run),
-# __name__ == "inference" and this block is skipped entirely —
-# preventing any port binding on import.
+# PORT is injected by the OpenEnv/HuggingFace evaluator at runtime.
+# We NEVER hardcode 7860 — we read the env var and fall back to 7860
+# only for local development. The __name__ guard ensures uvicorn is
+# NEVER started when openenv-core imports this module directly.
 if __name__ == "__main__":
-    print("🚀 PURE OPENENV SERVER RUNNING 🚀")
-    uvicorn.run(app, host="0.0.0.0", port=7860)
+    port = int(os.environ.get("PORT", 7860))
+    print(f"🚀 RailCascade SERVER STARTING ON PORT {port} 🚀")
+    uvicorn.run(
+        app,
+        host="0.0.0.0",
+        port=port,
+        log_level="info",
+    )
