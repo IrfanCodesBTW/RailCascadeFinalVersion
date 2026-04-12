@@ -29,18 +29,33 @@ tasks:
     blocked_edges: 1
     max_steps: 20
     difficulty: 0.2
+    grader:
+      metric: final_score
+      range: [0.0, 1.0]
+      goal: maximize
+      passing_threshold: 0.5
 
   - name: medium
     trains: 6
     blocked_edges: 3
     max_steps: 30
     difficulty: 0.5
+    grader:
+      metric: final_score
+      range: [0.0, 1.0]
+      goal: maximize
+      passing_threshold: 0.4
 
   - name: hard
     trains: 8
     blocked_edges: 3
     max_steps: 40
     difficulty: 0.9
+    grader:
+      metric: final_score
+      range: [0.0, 1.0]
+      goal: maximize
+      passing_threshold: 0.3
 
   - name: dynamic_medium
     trains: 8
