@@ -143,7 +143,38 @@ async def step_endpoint(request: Request):
 async def ping():
     return {"status": "ok"}
 
+# -------------------- STDOUT EVALUATION LOOP ---------
+# OpenEnv requires [START]/[STEP]/[END] blocks printed to stdout
+# so the evaluator can parse results. This runs ONLY when the file
+# is executed directly (python inference.py). The FastAPI server is
+# started separately via Dockerfile CMD using uvicorn CLI — these
+# two modes never run simultaneously.
+def run_evaluation_loop(task: str = "medium") -> None:
+    """Run one full episode and emit structured stdout blocks."""
+    env = RailCascadeEnv(task=task)
+    obs = env.reset()
+
+    print(f"[START] task={task}", flush=True)
+
+    step_num = 0
+    done = False
+
+    while not done:
+        step_num += 1
+        actions = StepActions(actions=[])          # no-op agent
+        obs, reward, done, info = env.step(actions)
+
+        step_reward = reward.step_reward if hasattr(reward, "step_reward") else 0.0
+        print(f"[STEP] step={step_num} reward={round(step_reward, 4)}", flush=True)
+
+    final_score = env.get_score()
+    print(f"[END] task={task} score={round(final_score, 4)} steps={step_num}", flush=True)
+
+
 # -------------------- MAIN ---------------------------
-# NO uvicorn.run() here. The Dockerfile CMD starts the server:
-#   uvicorn inference:app --host 0.0.0.0 --port ${PORT:-7860}
-# Running uvicorn.run() here causes [Errno 98] double-bind with the evaluator.
+# When the evaluator runs `python inference.py` directly it expects
+# stdout blocks — NOT a web server. We emit those and exit cleanly.
+# The actual API server is started by the Dockerfile CMD via uvicorn CLI.
+if __name__ == "__main__":
+    task = os.environ.get("TASK", "medium")
+    run_evaluation_loop(task=task)
