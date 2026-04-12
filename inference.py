@@ -143,14 +143,90 @@ async def step_endpoint(request: Request):
 async def ping():
     return {"status": "ok"}
 
+# -------------------- LLM AGENT ----------------------
+# OpenEnv injects API_BASE_URL and API_KEY into the environment.
+# We MUST use these — never hardcode keys or use other providers.
+def get_llm_actions(obs, task: str) -> StepActions:
+    """Call the OpenEnv LiteLLM proxy to decide actions for this step."""
+    import openai
+
+    api_base = os.environ.get("API_BASE_URL", "https://api.openai.com/v1")
+    api_key  = os.environ.get("API_KEY", "")
+
+    client = openai.OpenAI(base_url=api_base, api_key=api_key)
+
+    # Build a compact state summary for the prompt
+    active_trains = [t for t in obs.trains if not t.arrived]
+    blocked_tracks = [t.id for t in obs.tracks if t.blocked]
+
+    train_lines = []
+    for t in active_trains:
+        path_str = " -> ".join(t.path_remaining) if t.path_remaining else "none"
+        train_lines.append(
+            f"  Train {t.id}: pos={t.position} status={t.status} "
+            f"delay={t.delay} path={path_str}"
+        )
+
+    prompt = f"""You are a railway traffic controller. Minimize total train delay.
+
+Task: {task}
+Step: {obs.timestep}/{obs.max_steps}
+Blocked tracks: {blocked_tracks if blocked_tracks else 'none'}
+Active trains:
+{chr(10).join(train_lines) if train_lines else '  none'}
+
+For each active train, choose ONE action:
+- noop: continue on current path
+- hold: stop the train for one step to avoid conflict
+- reroute: provide a new path list (only if a clear alternative exists)
+
+Respond ONLY with a valid JSON array. Each element must have:
+  {{"train_id": <int>, "action": "noop"|"hold"|"reroute", "new_path": [<nodes>] or null}}
+
+Rules:
+- Use "reroute" only when the current path is fully blocked and you know an alternative.
+- new_path must start from the train's NEXT node (not current position).
+- For "noop" and "hold", set new_path to null.
+- Do not include arrived trains.
+
+JSON array only, no explanation:"""
+
+    try:
+        response = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.0,
+            max_tokens=512,
+        )
+        raw = response.choices[0].message.content.strip()
+        # Strip markdown fences if present
+        raw = raw.replace("```json", "").replace("```", "").strip()
+        action_list = json.loads(raw)
+
+        parsed = []
+        for item in action_list:
+            try:
+                parsed.append(SingleAction(
+                    train_id=int(item["train_id"]),
+                    action=item["action"],
+                    new_path=item.get("new_path") or None,
+                ))
+            except Exception:
+                continue
+        return StepActions(actions=parsed)
+
+    except Exception as e:
+        print(f"[LLM ERROR] {e} — falling back to noop", flush=True)
+        return StepActions(actions=[])
+
+
 # -------------------- STDOUT EVALUATION LOOP ---------
-# OpenEnv requires [START]/[STEP]/[END] blocks printed to stdout
-# so the evaluator can parse results. This runs ONLY when the file
-# is executed directly (python inference.py). The FastAPI server is
-# started separately via Dockerfile CMD using uvicorn CLI — these
+# OpenEnv requires [START]/[STEP]/[END] blocks printed to stdout.
+# This runs ONLY when the file is executed directly (python inference.py).
+# The FastAPI server is started separately via Dockerfile CMD — these
 # two modes never run simultaneously.
 def run_evaluation_loop(task: str = "medium") -> None:
-    """Run one full episode and emit structured stdout blocks."""
+    """Run one full episode with LLM agent and emit structured stdout blocks."""
     env = RailCascadeEnv(task=task)
     obs = env.reset()
 
@@ -161,7 +237,7 @@ def run_evaluation_loop(task: str = "medium") -> None:
 
     while not done:
         step_num += 1
-        actions = StepActions(actions=[])          # no-op agent
+        actions = get_llm_actions(obs, task)
         obs, reward, done, info = env.step(actions)
 
         step_reward = reward.step_reward if hasattr(reward, "step_reward") else 0.0
@@ -172,9 +248,8 @@ def run_evaluation_loop(task: str = "medium") -> None:
 
 
 # -------------------- MAIN ---------------------------
-# When the evaluator runs `python inference.py` directly it expects
-# stdout blocks — NOT a web server. We emit those and exit cleanly.
-# The actual API server is started by the Dockerfile CMD via uvicorn CLI.
+# Evaluator runs `python inference.py` directly and reads stdout blocks.
+# The actual API server is started by Dockerfile CMD via uvicorn CLI.
 if __name__ == "__main__":
     task = os.environ.get("TASK", "medium")
     run_evaluation_loop(task=task)
