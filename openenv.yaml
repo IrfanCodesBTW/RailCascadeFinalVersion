@@ -64,6 +64,11 @@ tasks:
     dynamic_block_interval: 3
     max_steps: 50
     difficulty: 0.7
+    grader:
+      metric: final_score
+      range: [0.0, 1.0]
+      goal: maximize
+      passing_threshold: 0.3
 
   - name: extreme
     trains: 10
@@ -72,6 +77,11 @@ tasks:
     dynamic_block_interval: 4
     max_steps: 60
     difficulty: 1.0
+    grader:
+      metric: final_score
+      range: [0.0, 1.0]
+      goal: maximize
+      passing_threshold: 0.2
 
   - name: vip_routing
     trains: 6
@@ -79,6 +89,43 @@ tasks:
     max_steps: 30
     difficulty: 0.6
     description: "VIP trains (id 0, 3) incur 5x delay penalty"
+    grader:
+      metric: final_score
+      range: [0.0, 1.0]
+      goal: maximize
+      passing_threshold: 0.3
+
+graders:
+  - task: easy
+    metric: final_score
+    range: [0.0, 1.0]
+    goal: maximize
+    passing_threshold: 0.5
+  - task: medium
+    metric: final_score
+    range: [0.0, 1.0]
+    goal: maximize
+    passing_threshold: 0.4
+  - task: hard
+    metric: final_score
+    range: [0.0, 1.0]
+    goal: maximize
+    passing_threshold: 0.3
+  - task: dynamic_medium
+    metric: final_score
+    range: [0.0, 1.0]
+    goal: maximize
+    passing_threshold: 0.3
+  - task: extreme
+    metric: final_score
+    range: [0.0, 1.0]
+    goal: maximize
+    passing_threshold: 0.2
+  - task: vip_routing
+    metric: final_score
+    range: [0.0, 1.0]
+    goal: maximize
+    passing_threshold: 0.3
 
 action_space:
   type: array
@@ -159,7 +206,6 @@ scoring:
     arrival: 10.0
     delay_penalty: -1.0
     conflict_penalty: -2.0
-  note: "VIP trains suffer 5x delay penalty. Explicit grader functions implemented natively."
   range: [0.0, 1.0]
 
 tags:
