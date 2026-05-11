@@ -159,12 +159,14 @@ async function stepEnv() {
 
     // Track history - use info.new_delay and info.conflicts (actual env field names)
     const inf = data.info || {};
-    stepHistory.push({
-        step: envState.timestep,
-        delay: inf.new_delay || 0,
-        conflicts: inf.conflicts || 0,
-        totalDelay: inf.total_delay != null ? inf.total_delay : 0,
-    });
+    if (envState) {
+        stepHistory.push({
+            step: envState.timestep,
+            delay: inf.new_delay || 0,
+            conflicts: inf.conflicts || 0,
+            totalDelay: inf.total_delay != null ? inf.total_delay : 0,
+        });
+    }
     totalConflicts += inf.conflicts || 0;
 
     return data;
